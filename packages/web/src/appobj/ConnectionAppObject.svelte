@@ -149,6 +149,8 @@
   import { getConnectionClickActionSetting } from '../settings/settingsTools';
   import { _t } from '../translations';
   import { isProApp } from '../utility/proTools';
+  import databaseConnectionConfigService from '../services/DatabaseConnectionConfigService.js';
+  import { showSnackbarSuccess, showSnackbarError } from '../utility/snackbar';
 
   export let data;
   export let passProps;
@@ -253,19 +255,45 @@
   const getContextMenu = () => {
     const driver = $extensions.drivers.find(x => x.engine == data.engine);
     const config = getCurrentConfig();
+    
+    // Debug logging
+    console.log('🐛 getContextMenu called for connection:', data._id);
+    console.log('🐛 config.runAsPortal:', config.runAsPortal);
+    console.log('🐛 config.storageDatabase:', config.storageDatabase);
+    console.log('🐛 data._id startsWith db-config-:', data._id?.startsWith('db-config-'));
+    console.log('🐛 openedConnections includes this id:', $openedConnections.includes(data._id));
+    
     const handleRefresh = () => {
       apiCall('server-connections/refresh', { conid: data._id });
     };
     const handleDisconnect = () => {
       disconnectServerConnection(data._id);
     };
-    const handleDelete = () => {
+    const handleDelete = async () => {
       showModal(ConfirmModal, {
         message: _t('connection.deleteConfirm', {
           defaultMessage: 'Really delete connection {name}?',
           values: { name: getConnectionLabel(data) },
         }),
-        onConfirm: () => apiCall('connections/delete', data),
+        onConfirm: async () => {
+          try {
+            // Check if this is a database-sourced connection
+            if (data._id && data._id.startsWith('db-config-')) {
+              // Use DatabaseConnectionConfigService for external API connections
+              await databaseConnectionConfigService.deleteConnectionConfig(data._id);
+              console.log('✅ Database connection configuration deleted:', data._id);
+              showSnackbarSuccess(`Connection "${getConnectionLabel(data)}" deleted successfully`);
+            } else {
+              // Use standard DbGate API for local connections
+              await apiCall('connections/delete', data);
+              console.log('✅ Local connection deleted:', data._id);
+              showSnackbarSuccess(`Connection "${getConnectionLabel(data)}" deleted successfully`);
+            }
+          } catch (error) {
+            console.error('❌ Error deleting connection:', error);
+            showSnackbarError(`Failed to delete connection "${getConnectionLabel(data)}": ${error.message}`);
+          }
+        },
       });
     };
     const handleDuplicate = () => {
@@ -328,18 +356,20 @@
         },
       ],
       { divider: true },
-      config.runAsPortal == false &&
-        !config.storageDatabase && [
+      (config.runAsPortal == false && !config.storageDatabase) || data._id?.startsWith('db-config-') ? (
+        console.log('🐛 Showing edit/delete menu section') || [
           {
             text: $openedConnections.includes(data._id)
               ? _t('connection.viewDetails', { defaultMessage: 'View details' })
               : _t('connection.edit', { defaultMessage: 'Edit' }),
             onClick: handleOpenConnectionTab,
           },
-          !$openedConnections.includes(data._id) && {
-            text: _t('connection.delete', { defaultMessage: 'Delete' }),
-            onClick: handleDelete,
-          },
+          (!$openedConnections.includes(data._id) || data._id?.startsWith('db-config-')) && (
+            console.log('🐛 Showing delete button') || {
+              text: _t('connection.delete', { defaultMessage: 'Delete' }),
+              onClick: handleDelete,
+            }
+          ),
           {
             text: _t('connection.duplicate', { defaultMessage: 'Duplicate' }),
             onClick: handleDuplicate,
@@ -357,7 +387,10 @@
                   },
                 })),
             },
-        ],
+        ]
+      ) : (
+        console.log('🐛 NOT showing edit/delete menu section') || []
+      ),
       { divider: true },
       !data.singleDatabase && [
         hasPermission(`dbops/query`) && {

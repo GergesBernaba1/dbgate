@@ -29,6 +29,7 @@
   import { initializeAppUpdates } from './utility/appUpdate';
   import { _t } from './translations';
   import { installCloudListeners } from './utility/cloudListeners';
+  import { setupAuthTokenListener } from './services/TokenService.js';
 
   export let isAdminPage = false;
 
@@ -76,7 +77,10 @@
     }
   }
 
-  onMount(loadApi);
+  onMount(() => {
+    setupAuthTokenListener();
+    loadApi();
+  });
 
   onMount(() => {
     const removed = document.getElementById('starting_dbgate_zero');

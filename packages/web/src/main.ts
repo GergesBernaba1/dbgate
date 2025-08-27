@@ -10,10 +10,19 @@ import ErrorPage from './ErrorPage.svelte';
 import EnterLicensePage from './EnterLicensePage.svelte';
 import SetAdminPasswordPage from './SetAdminPasswordPage.svelte';
 import RedirectPage from './RedirectPage.svelte';
+import { initializeTokenService } from './utility/initializeTokenService.js';
+
+// Import debug utilities in development
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  import('./utility/debugUtils.js').catch(console.error);
+}
 
 const isOauthCallback = handleOauthCallback();
 
 localStorageGarbageCollector();
+
+// Initialize token service for iframe communication
+initializeTokenService();
 
 function createApp() {
   if (isOauthCallback) {

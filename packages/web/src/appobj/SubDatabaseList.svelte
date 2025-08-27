@@ -18,7 +18,7 @@
   $: isExpandedOnlyBySearch = isExpandedBySearch && !isExpanded;
 
   $: databases = useDatabaseList({ conid: isExpandedOnlyBySearch ? null : data._id });
-  $: dbList = isExpandedOnlyBySearch ? getLocalStorage(`database_list_${data._id}`) || [] : $databases || [];
+  $: dbList = isExpandedOnlyBySearch ? [] : $databases || []; // Removed local storage dependency
 
   // .filter(x => filterName(filter, x.name, data.displayName, data.server))
 </script>

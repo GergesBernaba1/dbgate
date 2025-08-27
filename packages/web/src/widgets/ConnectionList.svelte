@@ -36,7 +36,6 @@
   import InputTextModal from '../modals/InputTextModal.svelte';
   import ConfirmModal from '../modals/ConfirmModal.svelte';
   import AppObjectListHandler from './AppObjectListHandler.svelte';
-  import { getLocalStorage } from '../utility/storageCache';
   import { switchCurrentDatabase } from '../utility/common';
   import openNewTab from '../utility/openNewTab';
   import { openConnection } from '../appobj/ConnectionAppObject.svelte';
@@ -47,6 +46,9 @@
     getOpenDetailOnArrowsSettings,
   } from '../settings/settingsTools';
   import DropDownButton from '../buttons/DropDownButton.svelte';
+  import ConnectionHistory from './ConnectionHistory.svelte';
+  import tokenService from '../services/TokenService.js';
+  import { onMount } from 'svelte';
 
   const connections = useConnectionList();
   const serverStatus = useServerStatus();
@@ -56,6 +58,20 @@
   let filter = '';
   let domListHandler;
   let domContainer = null;
+  let isTokenAvailable = false;
+
+  // Check token availability reactively
+  onMount(() => {
+    // Initial check with a delay to allow token extraction from URL
+    setTimeout(() => {
+      isTokenAvailable = tokenService.isTokenAvailable();
+    }, 500);
+    
+    // Listen for token updates
+    window.addEventListener('tokenUpdated', () => {
+      isTokenAvailable = tokenService.isTokenAvailable();
+    });
+  });
   let domFilter = null;
 
   const RECENT_AND_UNSAVED_LABEL = 'Recent & unsaved';
@@ -103,7 +119,7 @@
 
     const res = [];
     for (const con of [...connectionsWithParent, ...connectionsWithoutParent]) {
-      const databases = getLocalStorage(`database_list_${con._id}`) || [];
+      const databases = []; // Removed local storage dependency - databases will be loaded dynamically
       if (!filterName(filter, con.displayName, con.server, ...databases.map(x => x.name))) {
         continue;
       }
@@ -275,6 +291,7 @@
       const databaseClickAction = getDatabaseClickActionSetting();
       const openDetailOnArrows = getOpenDetailOnArrowsSettings();
 
+      // Handle database clicks (when data has both connection and database properties)
       if (data.database) {
         if (databaseClickAction == 'switch' && clickAction == 'leftClick') {
           switchCurrentDatabase({ connection: data.connection, name: data.database });
@@ -284,9 +301,19 @@
           switchCurrentDatabase({ connection: data.connection, name: data.database });
         }
       } else {
+        // Handle connection clicks (when data is the connection object itself)
+        const connection = data.connection || data; // Support both formats
+        const conid = data.conid || data._id; // Get connection ID from either property
+        
         if (clickAction == 'keyEnter' || clickAction == 'dblClick') {
-          openConnection(data.connection);
+          console.log('🖱️ Opening connection via double-click/enter:', connection);
+          openConnection(connection);
         } else {
+          console.log('🖱️ Single click on connection:', connection);
+          console.log('🖱️ Click action:', clickAction);
+          console.log('🖱️ Connection click action setting:', connectionClickAction);
+          console.log('🖱️ Connection ID:', conid);
+          
           const config = getCurrentConfig();
           if (
             config.runAsPortal == false &&
@@ -294,13 +321,14 @@
             connectionClickAction == 'openDetails' &&
             (clickAction == 'leftClick' || (clickAction == 'keyArrow' && openDetailOnArrows))
           ) {
+            console.log('🖱️ Opening connection details tab for:', conid);
             openNewTab({
-              title: getConnectionLabel(data.connection),
+              title: getConnectionLabel(connection),
               icon: 'img connection',
               tabComponent: 'ConnectionTab',
               tabPreviewMode: true,
               props: {
-                conid: data.conid,
+                conid: conid,
               },
             });
           }
@@ -370,6 +398,7 @@
       Add new connection
     </ToolbarButton> -->
   {/if}
+
 </WidgetsInnerContainer>
 
 <style>

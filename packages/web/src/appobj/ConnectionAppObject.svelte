@@ -4,7 +4,7 @@
     (filter, cfg = DEFAULT_CONNECTION_SEARCH_SETTINGS) =>
     props => {
       const { _id, displayName, server, user, engine } = props;
-      const databases = getLocalStorage(`database_list_${_id}`) || [];
+      const databases = []; // Removed local storage dependency - databases will be loaded dynamically
       const match = (engine || '').match(/^([^@]*)@/);
       const engineDisplay = match ? match[1] : engine;
 
@@ -20,12 +20,19 @@
       );
     };
   export function openConnection(connection, disableExpand = false) {
+    console.log('🔗 Opening connection:', connection);
+    console.log('🔗 Connection properties:', Object.keys(connection));
+    console.log('🔗 Connection ID:', connection._id);
+    console.log('🔗 Connection engine:', connection.engine);
+    
     if (connection.singleDatabase) {
       if (getOpenedSingleDatabaseConnections().includes(connection._id)) {
+        console.log('🔗 Single database connection already open');
         return;
       }
     } else {
       if (getOpenedConnections().includes(connection._id)) {
+        console.log('🔗 Server connection already open');
         return;
       }
     }

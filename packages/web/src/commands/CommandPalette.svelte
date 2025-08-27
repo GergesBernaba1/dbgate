@@ -41,7 +41,7 @@
       const conid = connection._id;
       if (connection.singleDatabase) continue;
       if (getCurrentConfig()?.singleDbConnection) continue;
-      const databases = getLocalStorage(`database_list_${conid}`) || [];
+      const databases = []; // Removed local storage dependency - databases will be loaded dynamically
       for (const db of databases) {
         databaseList.push({
           text: `${db.name} on ${getConnectionLabel(connection)}`,

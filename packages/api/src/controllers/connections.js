@@ -416,11 +416,21 @@ module.exports = {
     return res;
   },
 
-  async getCore({ conid, mask = false }) {
-    if (!conid) return null;
+  async getCore({ conid, mask = false, req = null }) {
+    logger.info(`🔍 getCore called for conid: ${conid}`);
+    
+    if (!conid) {
+      logger.info('🔍 No conid provided, returning null');
+      return null;
+    }
+    
     const volatile = volatileConnections[conid];
     if (volatile) {
+      logger.info(`✅ Found volatile connection: ${conid}`);
       return volatile;
+    } else {
+      logger.info(`❌ Volatile connection not found for: ${conid}`);
+      logger.info(`📊 Available volatile connections: ${Object.keys(volatileConnections).join(', ')}`);
     }
 
     const cloudMatch = conid.match(/^cloud\:\/\/(.+)\/(.+)$/);
@@ -435,6 +445,39 @@ module.exports = {
     const storageConnection = await storage.getConnection({ conid });
     if (storageConnection) {
       return storageConnection;
+    }
+
+    // Check if this is a database-sourced connection (db-config-*)
+    if (conid.startsWith('db-config-')) {
+      logger.info(`🔍 Attempting to load database connection: ${conid}`);
+      try {
+        const DatabaseConnectionLoader = require('../utility/databaseConnectionLoader');
+        const loader = new DatabaseConnectionLoader();
+        
+        // Extract URL token from request if available
+        let urlToken = null;
+        if (req && req.headers) {
+          // Check for URL token in custom header (case-insensitive)
+          urlToken = req.headers['x-url-token'] || req.headers['X-Url-Token'] || req.headers['x-external-token'];
+          
+          logger.info(`🔍 URL token available: ${!!urlToken}`);
+          logger.info(`🔍 Request headers: ${JSON.stringify(Object.keys(req.headers))}`);
+          if (urlToken) {
+            logger.info(`🔍 URL token length: ${urlToken.length}`);
+          }
+        }
+        
+        const databaseConnection = await loader.loadConnectionById(conid, req, urlToken);
+        
+        if (databaseConnection) {
+          // Add to volatile connections so subsequent calls find it quickly
+          volatileConnections[conid] = databaseConnection;
+          logger.info(`✅ Loaded and cached database connection: ${conid}`);
+          return databaseConnection;
+        }
+      } catch (error) {
+        logger.error(`❌ Failed to load database connection ${conid}:`, error);
+      }
     }
 
     if (portalConnections) {
@@ -583,5 +626,71 @@ module.exports = {
   async reloadConnectionList() {
     if (portalConnections) return;
     await this.datastore.unload();
+  },
+
+  registerVolatileConnection_meta: true,
+  async registerVolatileConnection({ connection }) {
+    logger.info(`📡 registerVolatileConnection called for: ${connection?._id} (${connection?.displayName})`);
+    
+    if (!connection || !connection._id) {
+      const errorMsg = 'Connection object with _id is required';
+      logger.error(`❌ ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    
+    // Add the connection to volatile storage
+    volatileConnections[connection._id] = {
+      ...connection,
+      unsaved: true, // Mark as unsaved/volatile
+    };
+    
+    logger.info(`✅ Registered volatile connection: ${connection._id} (${connection.displayName})`);
+    logger.info(`📊 Total volatile connections: ${Object.keys(volatileConnections).length}`);
+    
+    return {
+      success: true,
+      connectionId: connection._id
+    };
+  },
+
+  bulkRegisterVolatileConnections_meta: true,
+  async bulkRegisterVolatileConnections({ connections }) {
+    logger.info(`📡 bulkRegisterVolatileConnections called for ${connections?.length} connections`);
+    
+    if (!Array.isArray(connections)) {
+      const errorMsg = 'Connections array is required';
+      logger.error(`❌ ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    
+    const results = [];
+    
+    for (const connection of connections) {
+      if (!connection || !connection._id) {
+        logger.warn(`⚠️ Skipping invalid connection: ${JSON.stringify(connection)}`);
+        continue;
+      }
+      
+      // Add the connection to volatile storage
+      volatileConnections[connection._id] = {
+        ...connection,
+        unsaved: true, // Mark as unsaved/volatile
+      };
+      
+      results.push({
+        success: true,
+        connectionId: connection._id
+      });
+      
+      logger.info(`✅ Registered volatile connection: ${connection._id} (${connection.displayName})`);
+    }
+    
+    logger.info(`📊 Total volatile connections after bulk registration: ${Object.keys(volatileConnections).length}`);
+    
+    return {
+      success: true,
+      results: results,
+      totalRegistered: results.length
+    };
   },
 };

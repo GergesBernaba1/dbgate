@@ -147,6 +147,8 @@
   import ToolStripButton from '../buttons/ToolStripButton.svelte';
   import { getIntSettingsValue } from '../settings/settingsTools';
   import RowsLimitModal from '../modals/RowsLimitModal.svelte';
+  import queryHistoryService from '../services/QueryHistoryService.js';
+  import tokenService from '../services/TokenService.js';
 
   export let tabid;
   export let conid;
@@ -383,14 +385,48 @@
         limitRows: queryRowsLimit ? queryRowsLimit : undefined,
       });
     }
-    await apiCall('query-history/write', {
-      data: {
-        sql,
-        conid,
-        database,
-        date: new Date().getTime(),
-      },
-    });
+    
+    // Track the last executed SQL for history updates
+    lastExecutedSql = sql;
+    lastExecutionStartTime = Date.now();
+    
+    // Save query to history (external API if token available, otherwise local)
+    await saveQueryToHistory(sql, conid, database);
+  }
+
+  async function saveQueryToHistory(sql, conid, database, duration = 0, rowsAffected = 0, status = 'success', errorMessage = '') {
+    try {
+      if (tokenService.isTokenAvailable()) {
+        // Save to external API
+        await queryHistoryService.addQueryHistory({
+          sql,
+          conid,
+          database,
+          date: new Date().getTime(),
+          duration,
+          rowsAffected,
+          status,
+          errorMessage,
+          extraInfo: {
+            sessionId: sessionId,
+            autoCommit: driver?.implicitTransactions && isAutocommit
+          }
+        });
+      } else {
+        // Save to local API (existing behavior)
+        await apiCall('query-history/write', {
+          data: {
+            sql,
+            conid,
+            database,
+            date: new Date().getTime(),
+          },
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to save query to history:', error);
+      // Don't throw - we don't want to break query execution
+    }
   }
 
   async function executeControlCommand(command) {
@@ -536,8 +572,35 @@
     if (isAutocommit) {
       isInTransaction = false;
     }
-    timerLabel.stop();
+    const duration = timerLabel.stop();
+    
+    // Update query history with execution details if we have them
+    if (lastExecutedSql && tokenService.isTokenAvailable()) {
+      updateLastQueryHistoryWithResults(duration);
+    }
   };
+
+  let lastExecutedSql = '';
+  let lastExecutionStartTime = 0;
+
+  async function updateLastQueryHistoryWithResults(duration) {
+    try {
+      // Get basic execution stats - this is a simplified version
+      // In a real implementation, you'd want to capture more detailed results
+      // from the session data or result tabs
+      const basicStats = {
+        duration: duration || 0,
+        rowsAffected: 0, // Would need to be calculated from actual results
+        status: 'success'
+      };
+      
+      console.log('Query execution completed:', basicStats);
+      // Note: For now we're just logging. To properly update the history record,
+      // you'd need to store the history record ID when saving and then update it here
+    } catch (error) {
+      console.warn('Failed to update query history with results:', error);
+    }
+  }
 
   const handleSessionClosed = () => {
     sessionId = null;

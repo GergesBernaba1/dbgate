@@ -5,6 +5,8 @@ import { derived } from 'svelte/store';
 import { extendDatabaseInfo } from 'dbgate-tools';
 import { setLocalStorage } from '../utility/storageCache';
 import { apiCall, apiOff, apiOn } from './api';
+import databaseConnectionService from '../services/DatabaseConnectionService.js';
+import databaseConnectionConfigService from '../services/DatabaseConnectionConfigService.js';
 
 const databaseInfoLoader = ({ conid, database, modelTransFile }) => ({
   url: 'database-connections/structure',
@@ -138,9 +140,26 @@ const serverStatusLoader = () => ({
 });
 
 const connectionListLoader = () => ({
-  url: 'connections/list',
+  url: null, // Bypass original API - use only our external database
   params: {},
   reloadTrigger: { key: `connection-list-changed` },
+  customLoader: async () => {
+    // Load connections ONLY from external database API (no local storage)
+    try {
+      console.log('🔧 [metadataLoaders] Loading connections from external database API only');
+      
+      // Get connection configurations saved to database - this replaces local storage completely
+      const databaseConnections = await databaseConnectionConfigService.getSavedConnectionConfigs();
+      console.log('🔧 [metadataLoaders] Loaded database connections:', databaseConnections?.length || 0);
+      
+      // Return only database connections (no local connections)
+      return databaseConnections || [];
+    } catch (error) {
+      console.error('❌ Error loading connections from database API:', error);
+      // Return empty array if database fails (no local storage fallback)
+      return [];
+    }
+  }
 });
 
 const installedPluginsLoader = () => ({
@@ -178,16 +197,26 @@ const cloudContentListLoader = () => ({
 });
 
 async function getCore(loader, args) {
-  const { url, params, reloadTrigger, transform, onLoaded, errorValue } = loader(args);
+  const { url, params, reloadTrigger, transform, onLoaded, errorValue, customLoader } = loader(args);
   const key = stableStringify({ url, ...params });
 
   async function doLoad() {
-    const resp = await apiCall(url, params);
-    if (resp?.errorMessage && errorValue !== undefined) {
-      if (onLoaded) onLoaded(errorValue);
-      return errorValue;
+    let resp;
+    
+    if (customLoader) {
+      // Use custom loader function (for our database-only connections)
+      resp = await customLoader();
+    } else {
+      // Use standard API call
+      resp = await apiCall(url, params);
+      if (resp?.errorMessage && errorValue !== undefined) {
+        if (onLoaded) onLoaded(errorValue);
+        return errorValue;
+      }
     }
-    const res = (transform || (x => x))(resp);
+    
+    // Apply transform (can be async)
+    const res = transform ? await transform(resp) : resp;
     if (onLoaded) onLoaded(res);
     return res;
   }

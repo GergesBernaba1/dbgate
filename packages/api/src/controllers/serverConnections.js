@@ -46,11 +46,11 @@ module.exports = {
     delete this.requests[msgid];
   },
 
-  async ensureOpened(conid) {
+  async ensureOpened(conid, req = null) {
     const res = await lock.acquire(conid, async () => {
       const existing = this.opened.find(x => x.conid == conid);
       if (existing) return existing;
-      const connection = await connections.getCore({ conid });
+      const connection = await connections.getCore({ conid, req });
       if (!connection) {
         throw new Error(`serverConnections: Connection with conid="${conid}" not found`);
       }
@@ -144,14 +144,14 @@ module.exports = {
     if (!conid) return [];
     if (conid == '__model') return [];
     testConnectionPermission(conid, req);
-    const opened = await this.ensureOpened(conid);
+    const opened = await this.ensureOpened(conid, req);
     return opened?.databases ?? [];
   },
 
   version_meta: true,
   async version({ conid }, req) {
     testConnectionPermission(conid, req);
-    const opened = await this.ensureOpened(conid);
+    const opened = await this.ensureOpened(conid, req);
     return opened?.version ?? null;
   },
 
@@ -172,7 +172,7 @@ module.exports = {
           return Promise.resolve();
         }
         this.lastPinged[conid] = new Date().getTime();
-        const opened = await this.ensureOpened(conid);
+        const opened = await this.ensureOpened(conid, null); // null for internal ping method
         if (!opened) {
           return Promise.resolve();
         }
@@ -193,13 +193,13 @@ module.exports = {
     testConnectionPermission(conid, req);
     if (!keepOpen) this.close(conid);
 
-    await this.ensureOpened(conid);
+    await this.ensureOpened(conid, req);
     return { status: 'ok' };
   },
 
   async sendDatabaseOp({ conid, msgtype, name }, req) {
     testConnectionPermission(conid, req);
-    const opened = await this.ensureOpened(conid);
+    const opened = await this.ensureOpened(conid, req);
     if (!opened) {
       return null;
     }
@@ -241,7 +241,7 @@ module.exports = {
 
   async loadDataCore(msgtype, { conid, ...args }, req) {
     testConnectionPermission(conid, req);
-    const opened = await this.ensureOpened(conid);
+    const opened = await this.ensureOpened(conid, req);
     if (!opened) {
       return null;
     }
@@ -265,7 +265,7 @@ module.exports = {
   summaryCommand_meta: true,
   async summaryCommand({ conid, command, row }, req) {
     testConnectionPermission(conid, req);
-    const opened = await this.ensureOpened(conid);
+    const opened = await this.ensureOpened(conid, req);
     if (!opened) {
       return null;
     }

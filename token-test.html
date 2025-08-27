@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DbGate Token Test</title>
+</head>
+<body>
+    <h1>DbGate Token Test</h1>
+    
+    <div>
+        <h2>Send Token to DbGate iframe</h2>
+        <input type="text" id="tokenInput" placeholder="Enter your JWT token here" style="width: 400px;">
+        <button onclick="sendToken()">Send Token</button>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <iframe 
+            id="dbgateFrame" 
+            src="http://localhost:3000" 
+            width="100%" 
+            height="600"
+            style="border: 1px solid #ccc;">
+        </iframe>
+    </div>
+
+    <script>
+        function sendToken() {
+            const token = document.getElementById('tokenInput').value;
+            if (!token) {
+                alert('Please enter a token');
+                return;
+            }
+            
+            const iframe = document.getElementById('dbgateFrame');
+            console.log('Sending token to iframe:', token);
+            iframe.contentWindow.postMessage({ token: token }, '*');
+        }
+        
+        // Listen for messages from iframe
+        window.addEventListener('message', (event) => {
+            console.log('Received message from iframe:', event.data);
+            if (event.data.type === 'dbgate-ready') {
+                console.log('DbGate is ready to receive token');
+            }
+        });
+        
+        // Auto-send a test token after iframe loads (optional)
+        setTimeout(() => {
+            const testToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+            document.getElementById('tokenInput').value = testToken;
+            console.log('Test token loaded');
+        }, 1000);
+    </script>
+</body>
+</html>

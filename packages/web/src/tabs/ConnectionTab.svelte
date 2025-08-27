@@ -37,6 +37,8 @@
   import DatabaseLoginModal from '../modals/DatabaseLoginModal.svelte';
   import { _t } from '../translations';
   import ChooseCloudFolderModal from '../modals/ChooseCloudFolderModal.svelte';
+  import { saveConnectionAttempt } from '../utility/connectionHistoryIntegration.js';
+  import databaseConnectionConfigService from '../services/DatabaseConnectionConfigService.js';
 
   export let connection;
   export let tabid;
@@ -92,6 +94,11 @@
 
     isTesting = false;
     sqlConnectResult = resp;
+    
+    // Save connection attempt history
+    const success = !resp?.errorMessage;
+    await saveConnectionAttempt(connection, success, resp?.errorMessage || '');
+    
     return resp;
   }
 
@@ -159,6 +166,8 @@
   $: currentConnection = getCurrentConnectionCore($values, driver);
 
   async function handleSave() {
+    console.log('🚀 [DEBUG] handleSave called - starting connection save process');
+    
     if (saveOnCloud && !getCurrentConnection()?._id) {
       showModal(ChooseCloudFolderModal, {
         requiredRoleVariants: ['write', 'admin'],
@@ -181,6 +190,13 @@
               },
             }));
             showSnackbarSuccess('Connection saved');
+            
+            // Save connection to history
+            try {
+              await saveConnectionAttempt(saved, true);
+            } catch (error) {
+              console.error('Failed to save connection history:', error);
+            }
           }
         },
       });
@@ -196,6 +212,13 @@
           ...tab,
           title: getConnectionLabel(connection),
         }));
+        
+        // Save connection to history
+        try {
+          await saveConnectionAttempt(connection, true);
+        } catch (error) {
+          console.error('Failed to save connection history:', error);
+        }
       }
     } else {
       let connection = getCurrentConnection();
@@ -203,51 +226,85 @@
         ...connection,
         unsaved: false,
       };
-      const saved = await apiCall('connections/save', connection);
-      $values = {
-        ...$values,
-        _id: saved._id,
-        unsaved: false,
-      };
-      changeTab(tabid, tab => ({
-        ...tab,
-        title: getConnectionLabel(saved),
-        props: {
-          ...tab.props,
-          conid: saved._id,
-        },
-      }));
-      showSnackbarSuccess('Connection saved');
+      
+      // Save ONLY to database (replace local storage completely)
+      try {
+        const saved = await databaseConnectionConfigService.saveConnectionConfig(connection);
+        console.log('✅ Connection saved to database only:', saved);
+        
+        $values = {
+          ...$values,
+          _id: saved._id,
+          unsaved: false,
+        };
+        
+        changeTab(tabid, tab => ({
+          ...tab,
+          title: getConnectionLabel(saved),
+          props: {
+            ...tab.props,
+            conid: saved._id,
+          },
+        }));
+        
+        showSnackbarSuccess('Connection saved to database');
+        
+        // Also save connection attempt to history
+        try {
+          await saveConnectionAttempt(saved, true);
+        } catch (error) {
+          console.error('Failed to save connection history:', error);
+        }
+      } catch (error) {
+        console.error('❌ Failed to save connection to database:', error);
+        showSnackbarError(`Failed to save connection: ${error.message}`);
+      }
     }
   }
 
   async function handleConnect() {
     let connection = getCurrentConnection();
 
-    if (
-      // @ts-ignore
-      connection?._id?.startsWith('cloud://')
-    ) {
-      const saved = await apiCall('cloud/save-connection', { connection });
-      changeTab(tabid, tab => ({
-        ...tab,
-        title: getConnectionLabel(connection),
-      }));
-      openConnection(saved);
-    } else {
-      if (!connection._id) {
-        connection = {
-          ...connection,
-          unsaved: true,
+    try {
+      if (
+        // @ts-ignore
+        connection?._id?.startsWith('cloud://')
+      ) {
+        const saved = await apiCall('cloud/save-connection', { connection });
+        changeTab(tabid, tab => ({
+          ...tab,
+          title: getConnectionLabel(connection),
+        }));
+        openConnection(saved);
+        
+        // Save successful connection to history
+        await saveConnectionAttempt(saved, true);
+      } else {
+        if (!connection._id) {
+          connection = {
+            ...connection,
+            unsaved: true,
+          };
+        }
+        
+        // Save ONLY to database (replace local storage completely)
+        const saved = await databaseConnectionConfigService.saveConnectionConfig(connection);
+        console.log('✅ Connection saved to database during connect:', saved);
+        
+        $values = {
+          ...$values,
+          unsaved: connection.unsaved,
+          _id: saved._id,
         };
+        openConnection(saved);
+        
+        // Save successful connection to history
+        await saveConnectionAttempt(saved, true);
       }
-      const saved = await apiCall('connections/save', connection);
-      $values = {
-        ...$values,
-        unsaved: connection.unsaved,
-        _id: saved._id,
-      };
-      openConnection(saved);
+    } catch (error) {
+      // Save failed connection attempt to history
+      await saveConnectionAttempt(connection, false, error?.message || 'Connection failed');
+      throw error;
     }
     // closeMultipleTabs(x => x.tabid == tabid, true);
   }

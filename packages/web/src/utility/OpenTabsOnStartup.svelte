@@ -19,6 +19,17 @@
 
   $: openOnStartup($favorites);
 
+  // Helper function to preserve token when updating URL
+  function getUrlWithPreservedToken() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (token) {
+      console.log('Preserving token in URL:', token.substring(0, 20) + '...');
+      return `?token=${token}`;
+    }
+    return ' ';
+  }
+
   async function openOnStartup(list) {
     if (!list) return;
     if (opened) return;
@@ -33,13 +44,15 @@
       const open = list.find(x => x.urlPath == openFavoriteName);
       if (open) {
         openFavorite(open);
-        window.history.replaceState(null, null, ' ');
+        // Preserve token parameter when clearing hash
+        window.history.replaceState(null, null, getUrlWithPreservedToken());
       }
     } else if (openTabdata) {
       try {
         const json = JSON.parse(decodeURIComponent(openTabdata));
         openFavorite(json);
-        window.history.replaceState(null, null, ' ');
+        // Preserve token parameter when clearing hash
+        window.history.replaceState(null, null, getUrlWithPreservedToken());
       } catch (err) {
         showModal(ErrorMessageModal, { message: err.message });
       }

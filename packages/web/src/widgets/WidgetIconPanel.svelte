@@ -39,53 +39,43 @@
       icon: 'icon cloud-private',
     },
 
+    // HIDDEN: Commented out items as requested
     // {
-    //   icon: 'fa-table',
-    //   name: 'table',
+    //   icon: 'icon file',
+    //   name: 'file',
+    //   title: 'Favorites & Saved files',
     // },
-    {
-      icon: 'icon file',
-      name: 'file',
-      title: 'Favorites & Saved files',
-    },
+    // {
+    //   icon: 'icon plugin',
+    //   name: 'plugins',
+    //   title: 'Extensions & Plugins',
+    // },
+    // {
+    //   icon: 'icon cell-data',
+    //   name: 'cell-data',
+    //   title: 'Selected cell data detail view',
+    // },
+    // {
+    //   name: 'cloud-public',
+    //   title: 'DbGate Cloud',
+    //   icon: 'icon cloud-public',
+    // },
+    // {
+    //   icon: 'icon premium',
+    //   name: 'premium',
+    //   title: 'Premium promo',
+    //   isPremiumPromo: true,
+    // },
+
     {
       icon: 'icon history',
       name: 'history',
       title: 'Query history & Closed tabs',
     },
-    {
-      icon: 'icon archive',
-      name: 'archive',
-      title: 'Archive (saved tabular data)',
-    },
-    {
-      icon: 'icon plugin',
-      name: 'plugins',
-      title: 'Extensions & Plugins',
-    },
-    {
-      icon: 'icon cell-data',
-      name: 'cell-data',
-      title: 'Selected cell data detail view',
-    },
-    {
-      name: 'cloud-public',
-      title: 'DbGate Cloud',
-      icon: 'icon cloud-public',
-    },
-    {
-      icon: 'icon premium',
-      name: 'premium',
-      title: 'Premium promo',
-      isPremiumPromo: true,
-    },
     // {
-    //   icon: 'icon settings',
-    //   name: 'settings',
-    // },
-    // {
-    //   icon: 'fa-check',
-    //   name: 'settings',
+    //   icon: 'icon archive',
+    //   name: 'archive',
+    //   title: 'Archive (saved tabular data)',
     // },
   ];
 
@@ -176,7 +166,8 @@
     <FontIcon icon={$lockedDatabaseMode ? 'icon locked-database-mode' : 'icon unlocked-database-mode'} />
   </div> -->
 
-  {#if $cloudSigninTokenHolder}
+  <!-- HIDDEN: Cloud account / user icon commented out as requested -->
+  <!-- {#if $cloudSigninTokenHolder}
     <div
       class="wrapper"
       on:click={handleCloudAccountMenu}
@@ -189,11 +180,12 @@
     <div class="wrapper" on:click={handleOpenCloudLogin} data-testid="WidgetIconPanel_cloudAccount">
       <FontIcon icon="icon cloud-account" />
     </div>
-  {/if}
+  {/if} -->
 
-  <div class="wrapper" on:click={handleSettingsMenu} bind:this={domSettings} data-testid="WidgetIconPanel_settings">
+  <!-- HIDDEN: Settings icon commented out as requested -->
+  <!-- <div class="wrapper" on:click={handleSettingsMenu} bind:this={domSettings} data-testid="WidgetIconPanel_settings">
     <FontIcon icon="icon settings" />
-  </div>
+  </div> -->
 </div>
 
 <style>

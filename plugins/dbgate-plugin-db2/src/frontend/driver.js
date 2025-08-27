@@ -90,7 +90,7 @@ function adaptTableInfo(table) {
   connectionFields: [
     { field: 'server', type: 'string', label: 'Server', required: true },
     { field: 'port', type: 'number', label: 'Port', required: true, defaultValue: 50000 },
-    { field: 'database', type: 'string', label: 'Database name', required: true, placeholder: 'Required: enter a valid database name (e.g. SAMPLE)', help: 'DB2 always requires a database name to connect. You cannot connect to the server without specifying a database.' },
+    { field: 'database', type: 'string', label: 'Database name (optional)', required: false, placeholder: 'Optional: leave empty to connect without specific database, or enter database name (e.g. SAMPLE)', help: 'You can leave this empty to connect to the DB2 server without automatically selecting a specific database, or enter a database name to connect directly to that database.' },
     { field: 'user', type: 'string', label: 'User', required: true },
     { field: 'password', type: 'password', label: 'Password', required: true },
   ],

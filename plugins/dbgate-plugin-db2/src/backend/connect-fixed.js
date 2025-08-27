@@ -181,12 +181,14 @@ module.exports = async function connect({
       const escapedUser = user ? user.replace(/[;=]/g, c => encodeURIComponent(c)) : '';
       const escapedPassword = password ? password.replace(/[;=]/g, c => encodeURIComponent(c)) : '';
       const escapedServer = server ? server.replace(/[;=]/g, c => encodeURIComponent(c)) : '';
-      const escapedDbName = dbName ? dbName.replace(/[;=]/g, c => encodeURIComponent(c)) : '';      // Build a simpler connection string with minimal parameters that are most compatible
+      const escapedDbName = dbName ? dbName.replace(/[;=]/g, c => encodeURIComponent(c)) : '';
+      
+      // Build a simpler connection string with minimal parameters that are most compatible
       // with standard DB2 servers to avoid any incompatibilities
       
-      // Always include DATABASE= for DB2 (required)
+      // Only include DATABASE= if a database name is explicitly provided
       const connectionParams = [
-        `DATABASE=${escapedDbName}`,
+        dbName ? `DATABASE=${escapedDbName}` : null, // Only include if database is specified
         `HOSTNAME=${escapedServer}`,
         `PORT=${port}`,
         `PROTOCOL=TCPIP`,
@@ -197,7 +199,7 @@ module.exports = async function connect({
         'AUTOCOMMIT=1'              // Keep autocommit enabled
       ].filter(Boolean);
       connStr = connectionParams.join(';');
-      console.log(`[DB2] Using enhanced connection string format: DATABASE=xxx;HOSTNAME=xxx;PORT=xxx;...`);
+      console.log(`[DB2] Using enhanced connection string format${dbName ? ' with DATABASE specified' : ' without DATABASE (will not auto-connect to default)'}: ${connectionParams.join(';').replace(/PWD=[^;]*/g, 'PWD=***')}`);
     }
     
     // Try to establish connection with enhanced retry logic and exponential backoff
